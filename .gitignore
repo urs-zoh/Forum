@@ -1,0 +1,5 @@
+# Ignore VSCode tasks configuration
+.vscode/tasks.json
+
+# Ignore custom sync script
+sync-to-xampp.sh
