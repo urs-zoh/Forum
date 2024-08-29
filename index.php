@@ -1,28 +1,34 @@
 <?php
 session_start();
+require_once 'Database.php';
 
-// Define file paths
-$comments_file_path = __DIR__ . '/comments.txt';
+$db = new Database();
+$connection = $db->getConnection();
 
 if (!isset($_SESSION['loggedin']) || !$_SESSION['loggedin']) {
     header('Location: login.php');
     exit();
 }
 
+$userId = $_SESSION['user_id'];
+
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['comment'])) {
-    $email = $_SESSION['email'];
     $comment = trim($_POST['comment']);
 
     if (!empty($comment)) {
-        $comment_data = "$email: $comment" . PHP_EOL;
-
-        // Attempt to write to the file
-        if (file_put_contents($comments_file_path, $comment_data, FILE_APPEND | LOCK_EX) === false) {
-            $error_message = "Error saving comment.";
-        }
+        $sql = "INSERT INTO comments (user_id, comment) VALUES (:user_id, :comment)";
+        $params = [
+            ':user_id' => $userId,
+            ':comment' => $comment,
+        ];
+        $db->execute_query($sql, $params);
     }
 }
+
+// Fetch comments
+$comments = $db->execute_query("SELECT c.comment, u.username FROM comments c JOIN users u ON c.user_id = u.id ORDER BY c.created_at DESC")->fetchAll(PDO::FETCH_ASSOC);
 ?>
+
 
 <!doctype html>
 <html lang="en">
@@ -47,29 +53,27 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['comment'])) {
         <div class="mb-4">
             <h2>Posted Comments</h2>
             <?php
-            if (file_exists($comments_file_path)) {
-                $comments = file($comments_file_path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-                if (!empty($comments)) {
-                    foreach ($comments as $comment) {
-                        echo '<div class="border p-3 mb-2">';
-                        echo '<p><strong>' . htmlspecialchars(explode(':', $comment)[0]) . '</strong> says:</p>';
-                        echo '<p>' . htmlspecialchars(explode(':', $comment)[1]) . '</p>';
-                        echo '</div>';
-                    }
-                } else {
-                    echo '<p>No comments yet.</p>';
+            if (!empty($comments)) {
+                foreach ($comments as $comment) {
+                    echo '<div class="border p-3 mb-2">';
+                    echo '<p><strong>' . htmlspecialchars($comment['username']) . '</strong> says:</p>';
+                    echo '<p>' . htmlspecialchars($comment['comment']) . '</p>';
+                    echo '</div>';
                 }
+            } else {
+                echo '<p>No comments yet.</p>';
             }
             ?>
         </div>
+
 
         <!-- Post Comment Form -->
         <div>
             <h2>Post a Comment</h2>
             <?php if (isset($error_message)): ?>
-                <div class="alert alert-danger" role="alert">
-                    <?= $error_message; ?>
-                </div>
+            <div class="alert alert-danger" role="alert">
+                <?= $error_message; ?>
+            </div>
             <?php endif; ?>
             <form method="post">
                 <div class="mb-3">
@@ -82,7 +86,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['comment'])) {
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
         integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous">
-        </script>
+    </script>
 </body>
 
 </html>

@@ -1,53 +1,37 @@
 <?php
 session_start();
+require_once 'Database.php';
 
-// Define file path
-$file_path = __DIR__ . '/users.txt';
+$db = new Database();
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $email = $_POST['email'];
     $password = $_POST['password'];
     $cpassword = $_POST['cpassword'];
 
-    // Check if passwords match
     if ($password == $cpassword) {
         $hash = password_hash($password, PASSWORD_DEFAULT);
 
-        // Check if the user already exists
-        $users = file($file_path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-        $user_exists = false;
-        foreach ($users as $user) {
-            list($stored_email, ) = explode(':', trim($user));
-            if ($stored_email == $email) {
-                $user_exists = true;
-                break;
-            }
-        }
+        $sql = "SELECT id FROM users WHERE username = :email";
+        $user_exists = $db->execute_query($sql, [':email' => $email])->fetch(PDO::FETCH_ASSOC);
 
         if ($user_exists) {
             $error_message = "User already registered. <a href='login.php'>Login here</a>";
         } else {
-            // Save the user's email and hashed password to a file
-            $user_data = "$email:$hash" . PHP_EOL;
+            $sql = "INSERT INTO users (username, password) VALUES (:email, :password)";
+            $db->execute_query($sql, [':email' => $email, ':password' => $hash]);
 
-            // Attempt to write to the file
-            if (file_put_contents($file_path, $user_data, FILE_APPEND | LOCK_EX) !== false) {
-                // Set session variables for the newly registered user
-                $_SESSION['email'] = $email;
-                $_SESSION['loggedin'] = true;
-
-                // Redirect to index.php
-                header('Location: index.php');
-                exit();
-            } else {
-                $error_message = "Error writing to file.";
-            }
+            $_SESSION['user_id'] = $db->getConnection()->lastInsertId();
+            $_SESSION['loggedin'] = true;
+            header('Location: index.php');
+            exit();
         }
     } else {
         $error_message = "Passwords do not match.";
     }
 }
 ?>
+
 
 <!doctype html>
 <html lang="en">

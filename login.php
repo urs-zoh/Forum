@@ -1,28 +1,27 @@
 <?php
 session_start();
+require_once 'Database.php';
 
-// Define file path
-$file_path = __DIR__ . '/users.txt';
+$db = new Database();
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $email = $_POST['email'];
     $password = $_POST['password'];
 
-    // Read users from file
-    $users = file($file_path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    $sql = "SELECT id, password FROM users WHERE username = :email";
+    $user = $db->execute_query($sql, [':email' => $email])->fetch(PDO::FETCH_ASSOC);
 
-    foreach ($users as $user) {
-        list($stored_email, $stored_hash) = explode(':', trim($user));
-        if ($stored_email == $email && password_verify($password, $stored_hash)) {
-            $_SESSION['email'] = $email;
-            $_SESSION['loggedin'] = true;
-            header('Location: index.php');
-            exit();
-        }
+    if ($user && password_verify($password, $user['password'])) {
+        $_SESSION['user_id'] = $user['id'];
+        $_SESSION['loggedin'] = true;
+        header('Location: index.php');
+        exit();
+    } else {
+        $error_message = "Invalid email or password.";
     }
-    $error_message = "Invalid email or password.";
 }
 ?>
+
 
 <!doctype html>
 <html lang="en">
