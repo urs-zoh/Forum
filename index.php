@@ -12,23 +12,31 @@ if (!isset($_SESSION['loggedin']) || !$_SESSION['loggedin']) {
 
 $userId = $_SESSION['user_id'];
 
-if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['comment'])) {
+// Handle form submission (posting a comment)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && !empty($_POST['comment'])) {
     $comment = trim($_POST['comment']);
 
     if (!empty($comment)) {
-        $sql = "INSERT INTO comments (user_id, comment) VALUES (:user_id, :comment)";
-        $params = [
-            ':user_id' => $userId,
-            ':comment' => $comment,
-        ];
-        $db->execute_query($sql, $params);
+        // Insert the comment into the database
+        $sql = "INSERT INTO comments (comment, user_id, created_at) VALUES (?, ?, NOW())";
+        $stmt = $connection->prepare($sql);
+        $stmt->execute([$comment, $userId]);
+
+        // Refresh the page to display the new comment
+        header('Location: index.php');
+        exit();
     }
 }
 
-// Fetch comments
-$comments = $db->execute_query("SELECT c.comment, u.username FROM comments c JOIN users u ON c.user_id = u.id ORDER BY c.created_at DESC")->fetchAll(PDO::FETCH_ASSOC);
-?>
+// Fetch the current user's avatar
+$sql = "SELECT avatar FROM users WHERE id = ?";
+$stmt = $connection->prepare($sql);
+$stmt->execute([$userId]);
+$user = $stmt->fetch();
 
+// Fetch comments
+$comments = $db->execute_query("SELECT c.comment, u.email, u.avatar FROM comments c JOIN users u ON c.user_id = u.id ORDER BY c.created_at DESC")->fetchAll(PDO::FETCH_ASSOC);
+?>
 
 <!doctype html>
 <html lang="en">
@@ -43,9 +51,13 @@ $comments = $db->execute_query("SELECT c.comment, u.username FROM comments c JOI
 
 <body>
     <div class="container mt-md-5">
-        <!-- Logout Section -->
+        <!-- Top-right Avatar -->
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h1>Welcome to the Forum</h1>
+            <a href="profile.php">
+                <img src="data:image/jpeg;base64,<?= $user['avatar'] ?>" alt="User Avatar" class="rounded-circle"
+                    style="width: 50px; height: 50px;">
+            </a>
             <a href="logout.php" class="btn btn-danger">Logout</a>
         </div>
 
@@ -56,7 +68,8 @@ $comments = $db->execute_query("SELECT c.comment, u.username FROM comments c JOI
             if (!empty($comments)) {
                 foreach ($comments as $comment) {
                     echo '<div class="border p-3 mb-2">';
-                    echo '<p><strong>' . htmlspecialchars($comment['username']) . '</strong> says:</p>';
+                    echo '<img src="data:image/jpeg;base64,' . $comment['avatar'] . '" alt="User Avatar" class="rounded-circle" style="width: 30px; height: 30px;"> ';
+                    echo '<p><strong>' . htmlspecialchars($comment['email']) . '</strong> says:</p>';
                     echo '<p>' . htmlspecialchars($comment['comment']) . '</p>';
                     echo '</div>';
                 }
@@ -66,15 +79,9 @@ $comments = $db->execute_query("SELECT c.comment, u.username FROM comments c JOI
             ?>
         </div>
 
-
         <!-- Post Comment Form -->
         <div>
             <h2>Post a Comment</h2>
-            <?php if (isset($error_message)): ?>
-            <div class="alert alert-danger" role="alert">
-                <?= $error_message; ?>
-            </div>
-            <?php endif; ?>
             <form method="post">
                 <div class="mb-3">
                     <textarea class="form-control" name="comment" rows="4" required></textarea>

@@ -1,4 +1,7 @@
 <?php
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
 session_start();
 require_once 'Database.php';
 
@@ -8,11 +11,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $email = $_POST['email'];
     $password = $_POST['password'];
 
-    $sql = "SELECT id, password FROM users WHERE username = :email";
+    $sql = "SELECT id, password FROM users WHERE email = :email";
     $user = $db->execute_query($sql, [':email' => $email])->fetch(PDO::FETCH_ASSOC);
 
     if ($user && password_verify($password, $user['password'])) {
         $_SESSION['user_id'] = $user['id'];
+        $_SESSION['role'] = $user['role'];
         $_SESSION['loggedin'] = true;
         header('Location: index.php');
         exit();
@@ -38,9 +42,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <div class="container mt-md-5">
         <h1>Login</h1>
         <?php if (isset($error_message)): ?>
-            <div class="alert alert-danger" role="alert">
-                <?= $error_message; ?>
-            </div>
+        <div class="alert alert-danger" role="alert">
+            <?= $error_message; ?>
+        </div>
         <?php endif; ?>
         <form method="post">
             <div class="mb-3">
@@ -58,7 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
         integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous">
-        </script>
+    </script>
 </body>
 
 </html>

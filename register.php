@@ -8,18 +8,39 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $email = $_POST['email'];
     $password = $_POST['password'];
     $cpassword = $_POST['cpassword'];
+    $role = 'user'; // Default role is 'user'
+    $avatar = null;
+
+    // Handle avatar upload
+    if (!empty($_FILES['avatar']['tmp_name'])) {
+        $avatarData = file_get_contents($_FILES['avatar']['tmp_name']);
+        $avatar = base64_encode($avatarData); // Encode avatar as base64
+    }
+
+    // Admin can set role
+    if (isset($_POST['role']) && $_SESSION['role'] === 'admin') {
+        $role = $_POST['role'];
+    }
 
     if ($password == $cpassword) {
         $hash = password_hash($password, PASSWORD_DEFAULT);
 
-        $sql = "SELECT id FROM users WHERE username = :email";
+        // Check if user already exists
+        $sql = "SELECT id FROM users WHERE email = :email";
         $user_exists = $db->execute_query($sql, [':email' => $email])->fetch(PDO::FETCH_ASSOC);
 
         if ($user_exists) {
             $error_message = "User already registered. <a href='login.php'>Login here</a>";
         } else {
-            $sql = "INSERT INTO users (username, password) VALUES (:email, :password)";
-            $db->execute_query($sql, [':email' => $email, ':password' => $hash]);
+            // Insert the user into the database
+            $sql = "INSERT INTO users (email, password, role, avatar) VALUES (:email, :password, :role, :avatar)";
+            $db->execute_query($sql, [
+                ':email' => $email,
+                ':password' => $hash,
+                ':role' => $role,
+                ':avatar' => $avatar
+            ]);
+
 
             $_SESSION['user_id'] = $db->getConnection()->lastInsertId();
             $_SESSION['loggedin'] = true;
@@ -31,7 +52,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 }
 ?>
-
 
 <!doctype html>
 <html lang="en">
@@ -52,7 +72,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 <?= $error_message; ?>
             </div>
         <?php endif; ?>
-        <form method="post">
+        <form method="post" enctype="multipart/form-data">
             <div class="mb-3">
                 <label for="email" class="form-label">Email</label>
                 <input type="email" class="form-control" id="email" name="email" required>
@@ -65,6 +85,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 <label for="cpassword" class="form-label">Confirm Password</label>
                 <input type="password" class="form-control" id="cpassword" name="cpassword" required>
             </div>
+            <div class="mb-3">
+                <label for="avatar" class="form-label">Upload Avatar (optional)</label>
+                <input type="file" class="form-control" id="avatar" name="avatar" accept="image/*">
+            </div>
+
+            <?php if ($_SESSION['role'] === 'admin'): ?>
+                <div class="mb-3">
+                    <label for="role" class="form-label">Role</label>
+                    <select class="form-select" id="role" name="role">
+                        <option value="user">User</option>
+                        <option value="admin">Admin</option>
+                    </select>
+                </div>
+            <?php endif; ?>
+
             <button type="submit" class="btn btn-primary">Register</button>
         </form>
     </div>
